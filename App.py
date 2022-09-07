@@ -4,15 +4,17 @@ from marshmallow import Schema, fields, ValidationError, validate
 from marshmallow.validate import Length, Range, Regexp
 from flask_json import FlaskJSON, JsonError, json_response, as_json
 import logging
-from logging.config import fileConfig
+from logging import FileHandler, WARNING
 
 
 app = Flask(__name__)
-#logging.basicConfig(filename='record.log', level=logging.DEBUG,
-                       format="%(asctime)s - %(levelname)s - %(funcName)s:%(lineno)s - %(message)s")
 app.secret_key = "Secret key"
 json = FlaskJSON(app)
 
+file_handler=FileHandler('errorlog.txt')
+file_handler.setLevel(WARNING)
+
+app.logger.addHandler(file_handler)
 
 
 
@@ -21,8 +23,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 
 db=SQLAlchemy(app)
-
-
 
 class Data(db.Model):
 
@@ -42,26 +42,13 @@ class CreateSchema(Schema):
 
 input_data={}
 
-# @app.route("/")
-# def main():
-#     app.logger.debug("debug")
-#     app.logger.info("info")
-#     app.logger.warning("warning")
-#     app.logger.error("error")
-#     app.logger.critical("critical")
-#     return ""
-
-
 @app.route("/")
 def Index():
-    app.logger.info('Processing default request')
     page = request.args.get('page', 1, type=int)
     groceries = Data.query.order_by(Data.id).paginate(
         page, per_page=2)
     #all_data=Data.query.all()
     return render_template("index.html", groceries=groceries)
-
-
 
 ROWS_PER_PAGE=5
 @app.route("/insert", methods=['GET', 'POST'])
@@ -83,13 +70,15 @@ def insert():
             flash('Item added successfully')
             return redirect(url_for('Index'))
         except Exception as e:
-            #logger.debug("Already exists")
             flash('grocery item already exists')
             return redirect(url_for('Index'))
     except ValidationError as err:
         flash(err)
-        all_data=Data.query.all()
-        return render_template("index.html",groceries=all_data)
+        page = request.args.get('page', 1, type=int)
+        # all_data=Data.query.all()
+        groceries = Data.query.order_by(Data.id).paginate(
+            page, per_page=2)
+        return render_template("index.html",groceries=groceries)
 
     else:
          flash('Item Inserted Successfully')
@@ -110,9 +99,11 @@ def update():
             schema.load(update_data)
         except ValidationError as err:
             flash(err)
-            logger.log(err)
-            all_data=Data.query.all()
-            return render_template("index.html", groceries=all_data)
+            #all_data=Data.query.all()
+            page = request.args.get('page', 1, type=int)
+            groceries = Data.query.order_by(Data.id).paginate(
+                page, per_page=2)
+            return render_template("index.html", groceries=groceries)
         else:
             my_data.item = request.form['item']
             my_data.price = request.form['price']
@@ -129,5 +120,6 @@ def delete(id):
     return redirect(url_for('Index'))
 
 if __name__=="__main__":
-    app.run(debug=True)
+    app.run()
+
 
